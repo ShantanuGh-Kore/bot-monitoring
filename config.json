@@ -1,8 +1,8 @@
 {
-	"botName": "COVA",
-	"streamId": "st-5bda0ad1-6529-5279-948e-7d70bf790d80",
-	"clientSecret": "5v8WPdhAizR5FbeuLKrHTNK0oJTT1EhJu0dXQYt1IsU=",
-	"retrieveTokenUrl": "https://uat04.mobile.citibank.com",
-	"socketUrl" :"soawebsocketuat.citi.com",
-	"covaClientId" :"3896de66-f96d-42cf-ba0d-e0f16b58a6c5"
+	"botName": "<bot name>",
+	"streamId": "<bot stream id>",
+	"clientSecret": "<bot client secret>",
+	"retrieveTokenUrl": "<env retrieve token url for cova>",
+	"socketUrl" :"<env socket url>",
+	"covaClientId" :"<cova client id>"
 }
