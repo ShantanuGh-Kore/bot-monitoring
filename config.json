@@ -1,8 +1,14 @@
 {
 	"botName": "<bot name>",
-	"streamId": "<bot stream id>",
-	"clientSecret": "<bot client secret>",
-	"retrieveTokenUrl": "<env retrieve token url for cova>",
-	"socketUrl" :"<env socket url>",
-	"covaClientId" :"<cova client id>"
+	"streamId": "<bot stream ID>",
+	"ClientSecret": "<for cova bot to be used in citiPing.js>", 
+	"retrieveTokenUrl": "<for cova bot to be used in citiPing.js>", 
+	"socketUrl" :"<for cova bot to be used in citiPing.js>", 
+	"covaClientId" :"<for cova bot to be used in citiPing.js>", 
+	"host": "https://bots.kore.ai",
+	"appClientSecret": "<client secret generated when the app is enabled for the web channel>",
+	"identity": "<bot developer email id>",
+	"appClientId":"<client Id generated when the app is enabled for the web channel>",
+	"firstName": "<bot developer first name>",
+	"lastName": "<bot developer last name>"
 }

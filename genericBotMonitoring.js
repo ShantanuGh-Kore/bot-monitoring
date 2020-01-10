@@ -5,15 +5,18 @@
  */
 /////////////////////////   config   //////////////////////////
 var config = require('./config.json');
+var host = config.host;
 var botName = config.botName;
 var streamId = config.streamId;
-var clientSecret = config.clientSecret;
+var identity = config.identity;
+var clientId = config.appClientId;
+var clientSecret = config.appClientSecret;
 var isAnonymous = true;
-var retrieveTokenUrl = config.retrieveTokenUrl;
-var socketUrl = config.socketUrl;
-var covaClientId = config.covaClientId;
+//var aud =  "https://idproxy.kore.com/authorize";
+var fName = config.firstName; 
+var lName = config.lastName;
 ////////////////////////////////////////////////////////////////
-var schedular = require('node-schedule');
+
 var bodyParser = require('body-parser');
 const express = require('express');
 var template = require('url-template');
@@ -24,6 +27,11 @@ var jwt = require('jsonwebtoken');
 
 var ws;
 var message;
+var accessToken = "";
+var jwtToken = "";
+
+var startAPI_URL = host + "/api/1.1/rtm/start";
+var JWT_GRANT_API = host + "/api/1.1/oAuth/token/jwtgrant";
 
 var state = 'idle',
     response;
@@ -54,6 +62,15 @@ var pingPayload = {
 }
 
 /**
+ * Very first we need to get the jwt token by using jsonwebtoken module
+ */
+getJWTToken();
+
+/**
+ * Once the JWT Toke  available with that need to get the access/Bearer Toekn before initializing the websocket
+ */
+
+/**
  * Get the WebSocket API and initializ the Web Socket
  */
 var init = function(callback) {
@@ -61,8 +78,9 @@ var init = function(callback) {
     return new Promise(function (resolve, reject) {
         try {
         
-		retrieveToken(callback).then(function(resp) { getStartAPI(resp.ssgAuthorization.access_token, resp.authorization.accessToken, resp.callback).then(function(res) {
-			webSocketInit(res, res.callback);
+		getBearerToken(callback).then(function(resp) { getStartAPI(resp.callback).then(function(res) {
+            console.log("Inside websocket init@@@@@@@:   ",res.url);
+			webSocketInit(res.url, res.callback);
 			//console.log(ws);
          		resolve("done");
                 });});
@@ -86,73 +104,99 @@ var initPingPong = function(time) {
     }, time);
 }
 
-//initPingPong(40000);
+initPingPong(40000);
 
-function retrieveToken(callback){
-    var url = retrieveTokenUrl+'/gcgapi/uat3/api/prelogin/digital/users/chatBot/koreServices/tokenAndUserInfo/retrieve';
-    console.log(url);
+	/**
+ * Getting the JsonWebToken
+ */
+function getJWTToken(){
+    var options = {
+    "iat": new Date().getTime(),
+    "exp": new Date(new Date().getTime() + 24 * 60 * 60 * 1000).getTime(),
+    //"aud": aud,
+    "iss": clientId,
+    "sub": identity,
+    "isAnonymous": isAnonymous
+    }
+    var headers = {};
+    if(fName || lName) {
+    headers.header = {
+    "fName" : fName,
+    "lName" : lName
+    }
+    }
+    var token = jwt.sign(options, clientSecret, headers);
+    jwtToken = token;
+    console.log("jwt token"+token);
+}
+
+/**
+ * Get the Authentication/Bearer Token and initialize the
+ */
+
+ function getBearerToken(callback){
+    var url = template.parse(JWT_GRANT_API).expand({});
+    
     var _body = {
+        "assertion": jwtToken,   
         "botInfo": {
             "chatBot": botName,
             "taskBotId": streamId
-        } 
-    };    
+        },
+        "token": {}
+      };
+    
     var options = {
         method: 'POST',
         uri: url,
         headers: {
-            'Content-Type': "application/json",
-            'channelid': 'CRSDESKTOP',
-            'siteid': 'PLCN_HOMEDEPOT',
-            'client_id': covaClientId,
-            'businesscode': 'CRS'
+            'Content-Type': "application/json"
         },
 
         body: JSON.stringify(_body)
     };
     return request(options).then(function(res) {
-        var resp = JSON.parse(res);
+	var resp = JSON.parse(res);
         var _token = JSON.parse(res);
-        accessToken = _token.ssgAuthorization.access_token;
-        authToken = _token.authorization.accessToken;
-        console.log("access token##### "+accessToken);
-        resp.callback = callback;
-        return Promise.resolve(resp);         
+        accessToken = _token.authorization.accessToken;
+            console.log("access token"+accessToken);
+            resp.callback = callback;
+	//init();
+        return Promise.resolve(resp);
     }).catch(function(err) {
         return Promise.reject(err);
     })
-}
 
+ }
 
 
 /**
  * Get the Web Socket API from this 
  */
-function getStartAPI(accessToken,authToken, callback) {  
-    process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0
-    var url = "https://"+socketUrl+"/Fusion/api/rtm/start?Auth="+accessToken;
-    console.log("SOA url: ", url);
-    var _body = {"botInfo":{"chatBot":"THE HOME DEPOT","taskBotId": streamId,"customData":{"productName":"The Home Depot® Consumer Credit Card","changedueDateFlag":"","isUserCops":""},"tenanturl":{}},"token":{}};    
+function getStartAPI(callback) {  
+           
+
+    var url = template.parse(startAPI_URL).expand({});
+    var _body = {
+        "botInfo": {
+            "chatBot": botName,
+            "taskBotId": streamId
+        },
+        "token": {}
+    };
     var options = {
         method: 'POST',
         uri: url,
         headers: {
             'Content-Type': "application/json",
-            'Authorization': 'bearer '+authToken,
-            'Kore_Authorization': 'bearer '+authToken,
-            'accept': 'application/json',
-            'Host': socketUrl,
-            'Sec-Fetch-Mode': 'cors',
-            'Sec-Fetch-Site': 'cross-site'
+            'Authorization': "bearer " + accessToken
         },
-    
+
         body: JSON.stringify(_body)
     };
     return request(options).then(function(res) {
         var resp = JSON.parse(res);
         resp.callback = callback;
-        resp.acessToken = accessToken;
-        console.log("Response from the start api: ", resp);
         return Promise.resolve(resp);
     }).catch(function(err) {
         return Promise.reject(err);
@@ -163,33 +207,27 @@ function getStartAPI(accessToken,authToken, callback) {
 /**
  * WebSocket Initialization
  */
-function webSocketInit(newObj, callback) {
-    console.log("Inside ws init");
-    console.log(newObj.url);
-    var newUrl = newObj.url.split('?');
-    newUrl = newUrl[1];
-    var accessToken = newObj.acessToken;
-    newUrl = "wss://"+socketUrl+"/Fusion/rtm/bot?"+newUrl+"&Auth="+accessToken;
-    ws = new WebSocket(newUrl);
-    console.log("url .."+newUrl);
+function webSocketInit(url, callback) {
+    ws = new WebSocket(url);
+    console.log("call back .."+callback);
     ws.on('open', function open() {
-    console.log('Connected ' + new Date());
-	wsState = 'open';
+       console.log('Connected ' + new Date());
+	   wsState = 'open';
     });
     ws.on('close', function close() {
-    console.log('disconnected ' + new Date());
+        console.log('disconnected ' + new Date());
+
     });
 
     ws.on('message', function incoming(message) {
         console.log(message + " " + new Date());
-        console.log("Bot Message: ",message);
         count = count + 1;
         var _msg = JSON.parse(message);
         console.log("type."+_msg.type);
         if (_msg.type === 'bot_response') {
-            state = 'done';
+          state = 'done';
             response = _msg.message[0].component.payload.text;
-		    //callback(null,response); 
+            //callback(null,response); 
             //return _msg;
             callback.send(_msg);
         }
@@ -231,3 +269,5 @@ app.get('/send', function(req, res){
 });
 
 app.listen(3000);
+
+
