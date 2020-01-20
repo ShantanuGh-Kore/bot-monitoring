@@ -209,10 +209,13 @@ function getStartAPI(callback) {
  */
 function webSocketInit(url, callback) {
     ws = new WebSocket(url);
+    var startTime , stopTime, respTime;
     console.log("call back .."+callback);
     ws.on('open', function open() {
        console.log('Connected ' + new Date());
 	   wsState = 'open';
+       startTime = new Date();
+       console.log('Start time: ' + startTime);
     });
     ws.on('close', function close() {
         console.log('disconnected ' + new Date());
@@ -220,16 +223,21 @@ function webSocketInit(url, callback) {
     });
 
     ws.on('message', function incoming(message) {
-        console.log(message + " " + new Date());
+        console.log("Message!!!!### "+ message + " " + new Date());
         count = count + 1;
         var _msg = JSON.parse(message);
         console.log("type."+_msg.type);
         if (_msg.type === 'bot_response') {
-          state = 'done';
-            response = _msg.message[0].component.payload.text;
+            stopTime = new Date();
+            respTime = stopTime - startTime;
+            state = 'done';
+            //response = _msg.message[0].component.payload.text;
             //callback(null,response); 
             //return _msg;
+            console.log('Stop time: ' + stopTime);
+            _msg.responseTimeMs = respTime;
             callback.send(_msg);
+            ws.close();
         }
 
         if (message.indexOf("pong") > -1) {
